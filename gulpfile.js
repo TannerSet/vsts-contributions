@@ -2,8 +2,9 @@ const path = require("path");
 const gulp = require('gulp');
 const del = require("del");
 const yargs = require("yargs");
-const {exec, execSync} = require('child_process');
-const sass = require('gulp-sass');
+const { exec, execSync } = require('child_process');
+const sassCompiler = require('sass');
+const sass = require('gulp-sass')(sassCompiler); // Use the "sass" package as the compiler
 const tslint = require('gulp-tslint');
 const inlinesource = require('gulp-inline-source');
 
@@ -27,7 +28,6 @@ gulp.task('tslint', gulp.series(() => {
         .pipe(tslint.report());
 }));
 
-
 gulp.task('copy-sdk', gulp.series(() => {
     return gulp.src(['node_modules/vss-web-extension-sdk/lib/VSS.SDK.min.js'])
         .pipe(gulp.dest(`${distFolder}`));
@@ -44,8 +44,8 @@ gulp.task('copy', gulp.series(
     'copy-html')
 );
 
-gulp.task('webpack', gulp.series(async () => {``
-    const option = yargs.argv.release ? "-p" : "-d";
+gulp.task('webpack', gulp.series(async () => {
+    const option = yargs.argv.release ? "-p" : ""; // Removed "-d" option
     execSync(`node ./node_modules/webpack-cli/bin/cli.js ${option}`, {
         stdio: [null, process.stdout, process.stderr]
     });
@@ -73,7 +73,6 @@ gulp.task('package', gulp.series('clean', 'build', async () => {
 
             console.log(stdout);
             console.log(stderr);
-            
         });
 }));
 
