@@ -12,7 +12,7 @@ let delPromise = import('del');
 
 gulp.task('clean', gulp.series(async () => {
     const del = await delPromise;
-    return del.default([distFolder, "*.vsix"]);
+    return del([distFolder, "*.vsix"]);
 }));
 
 gulp.task('styles', gulp.series(() => {
