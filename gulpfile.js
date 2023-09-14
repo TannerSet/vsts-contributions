@@ -1,16 +1,24 @@
 const path = require("path");
 const gulp = require('gulp');
-const del = require("del");
 const yargs = require("yargs");
-const { exec, execSync } = require('child_process');
-const sassCompiler = require('sass');
-const sass = require('gulp-sass')(sassCompiler); // Use the "sass" package as the compiler
+const {exec, execSync} = require('child_process');
+const sass = require('gulp-sass');
 const tslint = require('gulp-tslint');
 const inlinesource = require('gulp-inline-source');
 
 const distFolder = 'dist';
 
+let del;
+
+import('del').then(module => {
+    del = module.default;
+});
+
 gulp.task('clean', gulp.series(() => {
+    if (!del) {
+        console.error('del module not loaded');
+        return;
+    }
     return del([distFolder, "*.vsix"]);
 }));
 
@@ -45,7 +53,7 @@ gulp.task('copy', gulp.series(
 );
 
 gulp.task('webpack', gulp.series(async () => {
-    const option = yargs.argv.release ? "-p" : ""; // Removed "-d" option
+    const option = yargs.argv.release ? "-p" : "-d";
     execSync(`node ./node_modules/webpack-cli/bin/cli.js ${option}`, {
         stdio: [null, process.stdout, process.stderr]
     });
