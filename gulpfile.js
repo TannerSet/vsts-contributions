@@ -1,80 +1,81 @@
-const path = require("path");
 const gulp = require('gulp');
-const yargs = require("yargs");
-const {exec, execSync} = require('child_process');
 const sass = require('gulp-sass');
-const tslint = require('gulp-tslint');
-const inlinesource = require('gulp-inline-source');
+const path = require('path');
+const { BundleAnalyzerPlugin } = require('webpack-bundle-analyzer');
 
-const distFolder = 'dist';
+gulp.task('styles', function () {
+  return gulp
+    .src('./styles/**/*.scss')
+    .pipe(sass.sync().on('error', sass.logError))
+    .pipe(gulp.dest(path.join(__dirname, 'dist/css')));
+});
 
-let delPromise = import('del');
+gulp.task('copy', function () {
+  return gulp
+    .src('./src/**/*.html')
+    .pipe(gulp.dest(path.join(__dirname, 'dist')));
+});
 
-gulp.task('clean', gulp.series(async () => {
-    const del = await delPromise;
-    return del([distFolder, "*.vsix"]);
-}));
+gulp.task('webpack', function (done) {
+  // Define your webpack build configuration here
+  const webpack = require('webpack');
+  const webpackConfig = require('./webpack.config.js');
 
-gulp.task('styles', gulp.series(() => {
-    return gulp.src("styles/**/*scss")
-        .pipe(sass())
-        .pipe(gulp.dest(distFolder));
-}));
-
-gulp.task('tslint', gulp.series(() => {
-    return gulp.src(["scripts/**/*ts", "scripts/**/*tsx"])
-        .pipe(tslint({
-            formatter: "verbose"
-        }))
-        .pipe(tslint.report());
-}));
-
-gulp.task('copy-sdk', gulp.series(() => {
-    return gulp.src(['node_modules/vss-web-extension-sdk/lib/VSS.SDK.min.js'])
-        .pipe(gulp.dest(`${distFolder}`));
-}));
-
-gulp.task('copy-html', gulp.series(() => {
-    return gulp.src("*.html")
-        .pipe(inlinesource())
-        .pipe(gulp.dest(distFolder));
-}));
-
-gulp.task('copy', gulp.series(
-    gulp.parallel('styles', 'copy-sdk'),
-    'copy-html')
-);
-
-gulp.task('webpack', gulp.series(async () => {
-    const option = yargs.argv.release ? "-p" : "-d";
-    execSync(`node ./node_modules/webpack-cli/bin/cli.js ${option}`, {
-        stdio: [null, process.stdout, process.stderr]
-    });
-}));
-
-gulp.task('build', gulp.parallel('webpack', 'copy', 'tslint'));
-
-gulp.task('package', gulp.series('clean', 'build', async () => {
-    const overrides = {}
-    if (yargs.argv.release) {
-        overrides.public = true;
-    } else {
-        const manifest = require('./vss-extension.json');
-        overrides.name = manifest.name + ": Development Edition";
-        overrides.id = manifest.id + "-dev";
+  webpack(webpackConfig, (err, stats) => {
+    if (err) {
+      console.error(err.stack || err);
+      if (err.details) {
+        console.error(err.details);
+      }
+      done();
+      return;
     }
-    const overridesArg = `--override "${JSON.stringify(overrides).replace(/"/g, '\\"')}"`;
-    const manifestsArg = `--manifests vss-extension.json`;
 
-    execSync(`tfx extension create ${overridesArg} ${manifestsArg} --rev-version`,
-        (err, stdout, stderr) => {
-            if (err) {
-                console.log(err);
-            }
+    const info = stats.toJson();
 
-            console.log(stdout);
-            console.log(stderr);
-        });
+    if (stats.hasErrors()) {
+      console.error(info.errors);
+    }
+
+    if (stats.hasWarnings()) {
+      console.warn(info.warnings);
+    }
+
+    done();
+  });
+});
+
+gulp.task('tslint', function () {
+  // Define tslint configuration and options here
+  const tslint = require('gulp-tslint');
+  const tslintConfig = require('./tslint.json');
+
+  return gulp
+    .src(['./src/**/*.ts', './src/**/*.tsx'])
+    .pipe(tslint(tslintConfig))
+    .pipe(tslint.report());
+});
+
+gulp.task('clean', function () {
+  // Define your clean logic here, for example, to delete files in the 'dist' folder
+  const del = require('del');
+  return del(['dist/**/*']);
+});
+
+gulp.task('build', gulp.series('clean', 'webpack', 'styles', 'copy', 'tslint'));
+
+gulp.task('package', gulp.series('build', function () {
+  // Additional tasks to run after the build is complete
+  // You can add more tasks here if needed
 }));
 
 gulp.task('default', gulp.series('package'));
+
+gulp.task('dev', gulp.series('default', function () {
+  // Watch for changes and trigger the 'package' task when changes occur
+  gulp.watch(['./src/**/*.*', './styles/**/*.scss'], gulp.series('package'));
+}));
+
+gulp.task('analyze-bundle', function () {
+  return gulp.src('./dist/*.js').pipe(BundleAnalyzerPlugin());
+});
