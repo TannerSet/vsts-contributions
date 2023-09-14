@@ -8,18 +8,11 @@ const inlinesource = require('gulp-inline-source');
 
 const distFolder = 'dist';
 
-let del;
+let delPromise = import('del');
 
-import('del').then(module => {
-    del = module.default;
-});
-
-gulp.task('clean', gulp.series(() => {
-    if (!del) {
-        console.error('del module not loaded');
-        return;
-    }
-    return del([distFolder, "*.vsix"]);
+gulp.task('clean', gulp.series(async () => {
+    const del = await delPromise;
+    return del.default([distFolder, "*.vsix"]);
 }));
 
 gulp.task('styles', gulp.series(() => {
